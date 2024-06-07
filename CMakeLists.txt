@@ -5,10 +5,25 @@ project(waldo CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(fmt REQUIRED)
-find_package(GTest REQUIRED)
+# find_package(GTest REQUIRED)
 
 include(FetchContent)
+
+FetchContent_Declare(fmt
+                     DOWNLOAD_EXTRACT_TIMESTAMP ON
+                     URL https://github.com/fmtlib/fmt/archive/refs/tags/10.1.1.tar.gz
+                     URL_HASH SHA512=288c349baac5f96f527d5b1bed0fa5f031aa509b4526560c684281388e91909a280c3262a2474d963b5d1bf7064b1c9930c6677fe54a0d8f86982d063296a54c)
+FetchContent_Makeavailable(fmt)
+
+FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG 58d77fa8070e8cec2dc1ed015d66b454c8d78850 # release-1.12.1
+    OVERRIDE_FIND_PACKAGE)
+FetchContent_MakeAvailable(googletest)
+
+# find_package(fmt REQUIRED)
+
 
 FetchContent_declare(microstl
                      GIT_REPOSITORY https://github.com/cry-inc/microstl
