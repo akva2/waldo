@@ -218,5 +218,6 @@ if(SDL2_TTF_FOUND)
                           IMPORTED_LOCATION "${SDL2_TTF_LIBRARY}"
                           INTERFACE_INCLUDE_DIRECTORIES "${SDL2_TTF_INCLUDE_DIR}"
                           INTERFACE_LINK_LIBRARIES SDL2::SDL2-static)
+   add_library(SDL2_ttf::SDL2_ttf-static ALIAS SDL2::TTF)
   endif()
 endif()
