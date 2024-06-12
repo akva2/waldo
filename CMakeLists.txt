@@ -55,6 +55,11 @@ target_include_directories(Waldo PUBLIC ${microstl_SOURCE_DIR} 3rd_party/bvh)
 target_link_libraries(Waldo PUBLIC fmt::fmt bvh)
 
 find_package(SDL2)
+
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/3rd_party)
+
+find_package(SDL2_ttf)
+
 if(SDL2_FOUND)
   add_executable(raytrace 3rd_party/bvh/camera.hpp
                           3rd_party/bvh/raytrace.cpp
@@ -67,7 +72,7 @@ if(SDL2_FOUND)
 
   # Note: SDL2::SDL2main has to come before SDL2::SDL2
   # https://github.com/msys2/MINGW-packages/issues/10459#issuecomment-1003700201
-  target_link_libraries(raytrace Waldo bvh SDL2::SDL2main SDL2::SDL2-static OpenMP::OpenMP_CXX)
+  target_link_libraries(raytrace Waldo bvh SDL2::SDL2main SDL2::SDL2-static SDL2::TTF OpenMP::OpenMP_CXX)
 endif()
 
 add_executable(center_stl apps/center_stl.cpp)

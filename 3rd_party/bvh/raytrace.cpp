@@ -1,10 +1,12 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <fmt/format.h>
 #include <iostream>
 #include <vector>
 
 #include <SDL.h>
+#include <SDL_ttf.h>
 
 #include "bvh.hpp"
 #include "camera.hpp"
@@ -116,8 +118,18 @@ int main(int argc, char *argv[])
     int32_t dx, dy;
     auto *pixels = static_cast<Color *>(malloc(WINDOW_WIDTH * WINDOW_HEIGHT * 4));
 
-    SDL_Texture *buffer = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING,
+    SDL_Texture *buffer = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
+                                            SDL_TEXTUREACCESS_STREAMING,
                                             WINDOW_WIDTH, WINDOW_HEIGHT);
+
+    TTF_Init();
+    TTF_Font* font = TTF_OpenFont("/usr/share/fonts/truetype/open-sans/OpenSans-Regular.ttf", 8);
+    SDL_Rect msg_rect;
+    msg_rect.x = 1750;
+    msg_rect.y = 10;
+    msg_rect.w = 150;
+    msg_rect.h = 30;
+    SDL_Texture* msg = nullptr;
 
     bool relative = true;
 
@@ -129,11 +141,12 @@ int main(int argc, char *argv[])
             Vector4 right;
             Vector4 forward;
             cam.calc_vectors(&up, &right, &forward);
+            bool updateCam = true;
 
             switch (event.type)
             {
             case SDL_QUIT:
-                is_running = false;
+                is_running = updateCam = false;
                 break;
             case SDL_MOUSEMOTION:
                 dx = event.motion.xrel;
@@ -143,7 +156,7 @@ int main(int argc, char *argv[])
             case SDL_KEYDOWN:
                 if (event.key.keysym.sym == SDLK_ESCAPE)
                 {
-                    is_running = false;
+                    is_running = updateCam = false;
                 }
                 else if (event.key.keysym.sym == SDLK_w)
                 {
@@ -169,6 +182,21 @@ int main(int argc, char *argv[])
             default:
                 break;
             }
+
+            if (updateCam) {
+                if (msg)
+                    SDL_DestroyTexture(msg);
+                SDL_Color White{255, 255, 255};
+                const auto message = fmt::format("x={:1.2f}, y={:1.2f}, z={:1.2f}, "
+                                                 "p={:1.2f}, y={:1.2f}",
+                                                 cam.get_pos()[0],
+                                                 cam.get_pos()[1], cam.get_pos()[2],
+                                                 cam.get_pitch(), cam.get_yaw());
+                SDL_Surface* surfMessage =
+                    TTF_RenderText_Blended_Wrapped(font, message.c_str(), White, 140);
+                msg = SDL_CreateTextureFromSurface(renderer, surfMessage);
+                SDL_FreeSurface(surfMessage);
+            }
         }
 
         if (!is_running)
@@ -179,8 +207,12 @@ int main(int argc, char *argv[])
         render(pixels, bvh, WINDOW_WIDTH, WINDOW_HEIGHT);
         SDL_UpdateTexture(buffer, nullptr, pixels, WINDOW_WIDTH * 4);
         SDL_RenderCopy(renderer, buffer, nullptr, nullptr);
+        if (msg)
+            SDL_RenderCopy(renderer, msg, nullptr, &msg_rect);
         SDL_RenderPresent(renderer);
     }
+    if (msg)
+        SDL_DestroyTexture(msg);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
