@@ -15,8 +15,8 @@
 
 #define CLAMP(x,min,max) ((x<min)?min:((x>max)?max:x))
 
-constexpr int WINDOW_WIDTH = 640;
-constexpr int WINDOW_HEIGHT = 640;
+constexpr int WINDOW_WIDTH = 1600;
+constexpr int WINDOW_HEIGHT = 900;
 constexpr float ROTATION_SPEED = .001;
 constexpr float MOVEMENT_SPEED = .1;
 
@@ -156,10 +156,10 @@ int main(int argc, char *argv[])
     TTF_Init();
     TTF_Font* font = TTF_OpenFont("/usr/share/fonts/truetype/open-sans/OpenSans-Regular.ttf", 8);
     SDL_Rect msg_rect;
-    msg_rect.x = 1750;
-    msg_rect.y = 10;
-    msg_rect.w = 150;
-    msg_rect.h = 30;
+    msg_rect.x = 0.91 * WINDOW_WIDTH;
+    msg_rect.y = 0.01 * WINDOW_HEIGHT;
+    msg_rect.w = 0.078 * WINDOW_WIDTH;
+    msg_rect.h = 0.027 * WINDOW_HEIGHT;
     SDL_Texture* msg = nullptr;
 
     bool relative = true;
@@ -226,13 +226,15 @@ int main(int argc, char *argv[])
                 if (msg)
                     SDL_DestroyTexture(msg);
                 SDL_Color White{255, 255, 255};
-                const auto message = fmt::format("x={:1.2f}, y={:1.2f}, z={:1.2f}, "
-                                                 "p={:1.2f}, y={:1.2f}",
-                                                 cam.get_pos()[0],
-                                                 cam.get_pos()[1], cam.get_pos()[2],
-                                                 cam.get_pitch(), cam.get_yaw());
+                const auto message =
+                    fmt::format("x={:1.2f}, y={:1.2f}, z={:1.2f}, "
+                                "p={:1.2f}, y={:1.2f}",
+                                cam.get_pos()[0],
+                                cam.get_pos()[1], cam.get_pos()[2],
+                                cam.get_pitch(), cam.get_yaw());
                 SDL_Surface* surfMessage =
-                    TTF_RenderText_Blended_Wrapped(font, message.c_str(), White, 140);
+                    TTF_RenderText_Blended_Wrapped(font, message.c_str(), White,
+                                                   0.072 * WINDOW_WIDTH);
                 msg = SDL_CreateTextureFromSurface(renderer, surfMessage);
                 SDL_FreeSurface(surfMessage);
             }
