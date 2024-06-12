@@ -11,8 +11,8 @@
 #include "raytrace.hpp"
 #include "vec4.hpp"
 
-constexpr int WINDOW_WIDTH = 640;
-constexpr int WINDOW_HEIGHT = 640;
+constexpr int WINDOW_WIDTH = 1920;
+constexpr int WINDOW_HEIGHT = 1080;
 constexpr float ROTATION_SPEED = .001;
 constexpr float MOVEMENT_SPEED = .1;
 
