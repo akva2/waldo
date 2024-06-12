@@ -8,31 +8,37 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # find_package(GTest REQUIRED)
 
 include(FetchContent)
+find_package(fmt)
+if(NOT fmt_FOUND)
+  FetchContent_Declare(fmt
+                       DOWNLOAD_EXTRACT_TIMESTAMP ON
+                       URL https://github.com/fmtlib/fmt/archive/refs/tags/10.1.1.tar.gz
+                       URL_HASH SHA512=288c349baac5f96f527d5b1bed0fa5f031aa509b4526560c684281388e91909a280c3262a2474d963b5d1bf7064b1c9930c6677fe54a0d8f86982d063296a54c)
+  FetchContent_Makeavailable(fmt)
+endif()
 
-FetchContent_Declare(fmt
-                     DOWNLOAD_EXTRACT_TIMESTAMP ON
-                     URL https://github.com/fmtlib/fmt/archive/refs/tags/10.1.1.tar.gz
-                     URL_HASH SHA512=288c349baac5f96f527d5b1bed0fa5f031aa509b4526560c684281388e91909a280c3262a2474d963b5d1bf7064b1c9930c6677fe54a0d8f86982d063296a54c)
-FetchContent_Makeavailable(fmt)
-
-FetchContent_Declare(
-    googletest
-    GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG 58d77fa8070e8cec2dc1ed015d66b454c8d78850 # release-1.12.1
-    OVERRIDE_FIND_PACKAGE)
-FetchContent_MakeAvailable(googletest)
-
-FetchContent_Declare(
-    SDL2
-    GIT_REPOSITORY  https://github.com/libsdl-org/SDL
-    GIT_TAG         release-2.30.3
-    GIT_PROGRESS    TRUE
-)
-FetchContent_MakeAvailable(sdl2)
-
-# find_package(fmt REQUIRED)
 find_package(OpenMP REQUIRED)
 
+find_package(GTest)
+if(NOT GTest_FOUND)
+  FetchContent_Declare(
+      googletest
+      GIT_REPOSITORY https://github.com/google/googletest.git
+      GIT_TAG 58d77fa8070e8cec2dc1ed015d66b454c8d78850 # release-1.12.1
+      OVERRIDE_FIND_PACKAGE)
+  FetchContent_MakeAvailable(googletest)
+endif()
+
+find_package(SDL2)
+if(NOT SDL2_FOUND)
+  FetchContent_Declare(
+      SDL2
+      GIT_REPOSITORY  https://github.com/libsdl-org/SDL
+      GIT_TAG         release-2.30.3
+      GIT_PROGRESS    TRUE
+  )
+  FetchContent_MakeAvailable(sdl2)
+endif()
 
 
 FetchContent_declare(microstl
@@ -46,30 +52,36 @@ add_library(Waldo src/ReadSTL.cpp
                   src/ReadSTL.hpp)
 
 target_include_directories(Waldo PUBLIC ${microstl_SOURCE_DIR} 3rd_party/bvh)
-target_link_libraries(Waldo PUBLIC fmt::fmt)
+target_link_libraries(Waldo PUBLIC fmt::fmt bvh)
 
-# set(TEST_SOURCES test/TestReadSTL.cpp)
+find_package(SDL2)
+if(SDL2_FOUND)
+  add_executable(raytrace 3rd_party/bvh/camera.hpp
+                          3rd_party/bvh/raytrace.cpp
+                          3rd_party/bvh/raytrace.hpp)
+  target_link_libraries(raytrace Waldo bvh SDL2::SDL2)
+  target_include_directories(raytrace PUBLIC ${microstl_SOURCE_DIR} 3rd_party/bvh src)
+  if(WIN32)
+    set_target_properties(raytrace PROPERTIES LINK_FLAGS /SUBSYSTEM:CONSOLE)
+  endif()
 
-# add_executable(Waldo-test ${TEST_SOURCES})
-# target_link_libraries(Waldo-test Waldo GTest::gtest GTest::gtest_main)
-# target_include_directories(Waldo-test PUBLIC ${PROJECT_SOURCE_DIR}/src)
+  # Note: SDL2::SDL2main has to come before SDL2::SDL2
+  # https://github.com/msys2/MINGW-packages/issues/10459#issuecomment-1003700201
+  target_link_libraries(raytrace Waldo bvh SDL2::SDL2main SDL2::SDL2-static OpenMP::OpenMP_CXX)
+endif()
 
-# enable_testing()
-# include(GoogleTest)
-# gtest_discover_tests(Waldo-test
-#                      WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/test
-#                      NO_PRETTY_VALUES)
+add_executable(center_stl apps/center_stl.cpp)
+target_include_directories(center_stl PUBLIC ${microstl_SOURCE_DIR})
+#target_link_libraries(center_stl microstl)
 
+set(TEST_SOURCES test/TestReadSTL.cpp)
 
-                     
-# add_executable(Raytrace 3rd_party/bvh/${raytrace})
-# target_link_libraries(Raytrace Waldo GTest::gtest GTest::gtest_main SDL2::SDL2)
+add_executable(Waldo-test ${TEST_SOURCES})
+target_link_libraries(Waldo-test Waldo GTest::gtest GTest::gtest_main)
+target_include_directories(Waldo-test PUBLIC ${PROJECT_SOURCE_DIR}/src)
 
-# add_library(bvh "bvh.cpp" "bvh.hpp" "subdivision.hpp" "ray_intersection.hpp" "utils.hpp" "non_copyable.hpp")
-add_executable(raytrace "3rd_party/bvh/raytrace.cpp" "3rd_party/bvh/camera.hpp" "3rd_party/bvh/raytrace.hpp")
-set_target_properties(raytrace PROPERTIES LINK_FLAGS /SUBSYSTEM:CONSOLE)
-target_include_directories(raytrace PUBLIC ${PROJECT_SOURCE_DIR}/src)
-
-# Note: SDL2::SDL2main has to come before SDL2::SDL2
-# https://github.com/msys2/MINGW-packages/issues/10459#issuecomment-1003700201
-target_link_libraries(raytrace Waldo bvh SDL2::SDL2main SDL2::SDL2-static OpenMP::OpenMP_CXX)
+enable_testing()
+include(GoogleTest)
+gtest_discover_tests(Waldo-test
+                     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/test
+                     NO_PRETTY_VALUES)
