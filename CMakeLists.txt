@@ -18,10 +18,11 @@ FetchContent_Declare(fmt
                      URL_HASH SHA512=288c349baac5f96f527d5b1bed0fa5f031aa509b4526560c684281388e91909a280c3262a2474d963b5d1bf7064b1c9930c6677fe54a0d8f86982d063296a54c)
 FetchContent_MakeAvailable(fmt)
 
+set(BUILD_GMOCK OFF CACHE INTERNAL "")
 FetchContent_Declare(
     GTest
     GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG 58d77fa8070e8cec2dc1ed015d66b454c8d78850) # release-1.12.1
+    GIT_TAG f8d7d77c06936315286eb55f8de22cd23c188571) # release-1.14
 FetchContent_MakeAvailable(GTest)
 
 FetchContent_Declare(
@@ -58,7 +59,6 @@ target_link_libraries(Waldo PUBLIC fmt::fmt bvh)
 add_executable(raytrace 3rd_party/bvh/camera.hpp
                         3rd_party/bvh/raytrace.cpp
                         3rd_party/bvh/raytrace.hpp)
-target_link_libraries(raytrace Waldo bvh SDL2::SDL2)
 target_include_directories(raytrace PUBLIC ${microstl_SOURCE_DIR} 3rd_party/bvh src)
 if(WIN32)
   set_target_properties(raytrace PROPERTIES LINK_FLAGS /SUBSYSTEM:CONSOLE)

@@ -1,5 +1,6 @@
 #include <chrono>
 #include <cmath>
+#include <math.h>
 #include <cstdio>
 #include <fmt/format.h>
 #include <iostream>
@@ -15,15 +16,15 @@
 
 #define CLAMP(x,min,max) ((x<min)?min:((x>max)?max:x))
 
-constexpr int WINDOW_WIDTH = 1600;
-constexpr int WINDOW_HEIGHT = 900;
+constexpr int WINDOW_WIDTH = 1024;
+constexpr int WINDOW_HEIGHT = 768;
 constexpr float ROTATION_SPEED = .001;
 constexpr float MOVEMENT_SPEED = .1;
 
 
 Camera cam({0, -2, 0}, {0, 0, 0});
-Vector4 light(100, 100, 100);
-Vector4 material(255, 245, 213, 127); // default material color
+Vector4 light(100, -100, 100);
+Vector4 material(255, 245, 213, 127); // default material color (argb)
 double total_time_ns = 0.0;
 size_t num_frames = 0;
 
@@ -76,7 +77,7 @@ static void render(Color *pixels, const BVH::AABBTree &bvh, int width, int heigh
         {
             // Map t from [0, inf[ to [0, 1[
             // https://math.stackexchange.com/a/3200751/691043
-            float t_normalized = std::atan(t) / (M_PI_2);
+            float t_normalized = std::atan(t) / (M_PI / 2);
             
             // Method 1: Depth map render - show how far to geometry the camera is. White = close, gray = far away
             if (render_method == 1) { 
@@ -87,24 +88,31 @@ static void render(Color *pixels, const BVH::AABBTree &bvh, int width, int heigh
             // Method 2: Normal map render - interpret normal vector as an rgb-vector. All blue = [0,0,1] is normal pointing straight up
             else if (render_method == 2) {
                 pixels[pixel_x + pixel_y * width] = { 255,
-                                                      (unsigned char)((normal.x + 1) * 128),
+                                                      (unsigned char)((normal.z + 1) * 128),
                                                       (unsigned char)((normal.y + 1) * 128),
-                                                      (unsigned char)((normal.z + 1) * 128) };
+                                                      (unsigned char)((normal.x + 1) * 128) };
 
             }
             // Default: Phong shading https://en.wikipedia.org/wiki/Phong_reflection_model 
             else {
+
+                Vector4 ambient_color(255, 255, 0, 0); // (abgr)
+                Vector4 specular_color(255, 255, 255, 255); // (abgr)
                 Vector4 light_vector = (light - pt).normalized3();
-                Vector4 reflection_vector = (2 * (light_vector.dot3(normal)) * normal - light_vector).normalized3();
+                Vector4 reflection_vector = (light_vector - 2 * (light_vector.dot3(normal)) * normal).normalized3();
                 float specular = reflection_vector.dot3(ray_direction.normalized3());
+                float diffuse = light_vector.dot3(normal);
                 
-                Vector4 pixel_color =       0.1 * material;                                   // Ambient
-                pixel_color = pixel_color + 0.8 * material * light_vector.dot3(normal);       // Diffuse
-                pixel_color = pixel_color + 0.4 * pow(specular, 2) * Vector4(255,255,255,255);// Specular
+                Vector4 pixel_color = 0.25 * ambient_color;                               // Ambient
+                if(diffuse > 0)
+                    pixel_color = pixel_color + 0.8 * material * diffuse;                 // Diffuse
+                if(specular > 0)
+                    pixel_color = pixel_color + 0.5 * pow(specular, 1.5) * specular_color;// Specular
+                
                 pixels[pixel_x + pixel_y * width] = { 255,
-                                                      (unsigned char)(CLAMP(pixel_color[1],0,255)),
+                                                      (unsigned char)(CLAMP(pixel_color[3],0,255)),
                                                       (unsigned char)(CLAMP(pixel_color[2],0,255)),
-                                                      (unsigned char)(CLAMP(pixel_color[3],0,255))};
+                                                      (unsigned char)(CLAMP(pixel_color[1],0,255))};
             }
 
         }
@@ -122,6 +130,7 @@ static void render(Color *pixels, const BVH::AABBTree &bvh, int width, int heigh
 
 int main(int argc, char *argv[])
 {
+    std::cout << "Raytrace start" << std::endl;
     if (argc < 2)
     {
         puts("Expected arguments: mesh.[stl|tri]");
@@ -154,12 +163,12 @@ int main(int argc, char *argv[])
                                             WINDOW_WIDTH, WINDOW_HEIGHT);
 
     TTF_Init();
-    TTF_Font* font = TTF_OpenFont("/usr/share/fonts/truetype/open-sans/OpenSans-Regular.ttf", 8);
+    TTF_Font* font = TTF_OpenFont("c:/Windows/Fonts/calibrib.ttf", 16);
     SDL_Rect msg_rect;
     msg_rect.x = 0.91 * WINDOW_WIDTH;
     msg_rect.y = 0.01 * WINDOW_HEIGHT;
-    msg_rect.w = 0.078 * WINDOW_WIDTH;
-    msg_rect.h = 0.027 * WINDOW_HEIGHT;
+    msg_rect.w = 0.070 * WINDOW_WIDTH;
+    msg_rect.h = 0.154 * WINDOW_HEIGHT;
     SDL_Texture* msg = nullptr;
 
     bool relative = true;
@@ -225,10 +234,10 @@ int main(int argc, char *argv[])
             if (updateCam) {
                 if (msg)
                     SDL_DestroyTexture(msg);
-                SDL_Color White{255, 255, 255};
+                SDL_Color White{255, 255, 255, 255};
                 const auto message =
-                    fmt::format("x={:1.2f}, y={:1.2f}, z={:1.2f}, "
-                                "p={:1.2f}, y={:1.2f}",
+                    fmt::format("x = {:1.2f}, y = {:1.2f}, z = {:1.2f}, "
+                                "p = {:1.2f}, y = {:1.2f}",
                                 cam.get_pos()[0],
                                 cam.get_pos()[1], cam.get_pos()[2],
                                 cam.get_pitch(), cam.get_yaw());
