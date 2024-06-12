@@ -119,6 +119,8 @@ int main(int argc, char *argv[])
     SDL_Texture *buffer = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING,
                                             WINDOW_WIDTH, WINDOW_HEIGHT);
 
+    bool relative = true;
+
     while (true)
     {
         while (SDL_PollEvent(&event) != 0)
@@ -159,6 +161,12 @@ int main(int argc, char *argv[])
                 {
                     cam.move(right * MOVEMENT_SPEED);
                 }
+                else if (event.key.keysym.sym == SDLK_g)
+                {
+                    relative = !relative;
+                    SDL_SetRelativeMouseMode(relative ? SDL_TRUE : SDL_FALSE);
+                }
+            default:
                 break;
             }
         }
