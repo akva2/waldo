@@ -13,12 +13,17 @@
 #include "raytrace.hpp"
 #include "vec4.hpp"
 
-constexpr int WINDOW_WIDTH = 1920;
-constexpr int WINDOW_HEIGHT = 1080;
+#define CLAMP(x,min,max) ((x<min)?min:((x>max)?max:x))
+
+constexpr int WINDOW_WIDTH = 640;
+constexpr int WINDOW_HEIGHT = 640;
 constexpr float ROTATION_SPEED = .001;
 constexpr float MOVEMENT_SPEED = .1;
 
+
 Camera cam({0, -2, 0}, {0, 0, 0});
+Vector4 light(100, 100, 100);
+Vector4 material(255, 245, 213, 127); // default material color
 double total_time_ns = 0.0;
 size_t num_frames = 0;
 
@@ -27,7 +32,7 @@ struct Color
     unsigned char a, b, g, r;
 };
 
-static void render(Color *pixels, const BVH::AABBTree &bvh, int width, int height)
+static void render(Color *pixels, const BVH::AABBTree &bvh, int width, int height, int render_method)
 {
     float fov = cam.get_fov();
     float tan_half_fov = std::tan(fov / 2);
@@ -72,15 +77,38 @@ static void render(Color *pixels, const BVH::AABBTree &bvh, int width, int heigh
             // Map t from [0, inf[ to [0, 1[
             // https://math.stackexchange.com/a/3200751/691043
             float t_normalized = std::atan(t) / (M_PI_2);
-            unsigned char pixel_color = (t_normalized * t_normalized) * 255;
-            // pixels[pixel_x + pixel_y * width] = {255, pixel_color, pixel_color, pixel_color};
-            pixels[pixel_x + pixel_y * width] = { 255,
-                                                  (unsigned char) ((normal.x+1) * 128),
-                                                  (unsigned char) ((normal.y+1) * 128),
-                                                  (unsigned char) ((normal.z+1) * 128) };
+            
+            // Method 1: Depth map render - show how far to geometry the camera is. White = close, gray = far away
+            if (render_method == 1) { 
+                unsigned char pixel_color = (t_normalized * t_normalized) * 255;
+                pixels[pixel_x + pixel_y * width] = {255, pixel_color, pixel_color, pixel_color};
+
+            }
+            // Method 2: Normal map render - interpret normal vector as an rgb-vector. All blue = [0,0,1] is normal pointing straight up
+            else if (render_method == 2) {
+                pixels[pixel_x + pixel_y * width] = { 255,
+                                                      (unsigned char)((normal.x + 1) * 128),
+                                                      (unsigned char)((normal.y + 1) * 128),
+                                                      (unsigned char)((normal.z + 1) * 128) };
+
+            }
+            // Default: Phong shading https://en.wikipedia.org/wiki/Phong_reflection_model 
+            else {
+                Vector4 light_vector = (light - pt).normalized3();
+                Vector4 reflection_vector = (2 * (light_vector.dot3(normal)) * normal - light_vector).normalized3();
+                float specular = reflection_vector.dot3(ray_direction.normalized3());
+                
+                Vector4 pixel_color =       0.1 * material;                                   // Ambient
+                pixel_color = pixel_color + 0.8 * material * light_vector.dot3(normal);       // Diffuse
+                pixel_color = pixel_color + 0.4 * pow(specular, 2) * Vector4(255,255,255,255);// Specular
+                pixels[pixel_x + pixel_y * width] = { 255,
+                                                      (unsigned char)(CLAMP(pixel_color[1],0,255)),
+                                                      (unsigned char)(CLAMP(pixel_color[2],0,255)),
+                                                      (unsigned char)(CLAMP(pixel_color[3],0,255))};
+            }
 
         }
-        else
+        else // background image: All black
         {
             pixels[pixel_x + pixel_y * width] = {255, 0, 0, 0};
         }
@@ -94,14 +122,16 @@ static void render(Color *pixels, const BVH::AABBTree &bvh, int width, int heigh
 
 int main(int argc, char *argv[])
 {
-    if (argc != 2)
+    if (argc < 2)
     {
         puts("Expected arguments: mesh.[stl|tri]");
         return 1;
     }
-
+    
     const char *filepath = argv[1];
-    std::vector<BVH::Triangle> tris = load_bvh_tris_from_mesh_file(filepath, 0.01f);
+    float scale = (argc > 2) ? std::stof(argv[2]) : 0.01;
+
+    std::vector<BVH::Triangle> tris = load_bvh_tris_from_mesh_file(filepath, scale);
     std::cout << "Loaded " << tris.size() << " triangles from " << filepath << std::endl;
     BVH::AABBTree bvh(tris, 0.001f);
     bvh.print_stats();
@@ -115,6 +145,7 @@ int main(int argc, char *argv[])
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
     bool is_running = true;
+    int render_method = 0;
     int32_t dx, dy;
     auto *pixels = static_cast<Color *>(malloc(WINDOW_WIDTH * WINDOW_HEIGHT * 4));
 
@@ -154,10 +185,12 @@ int main(int argc, char *argv[])
                 cam.rotate(dx * ROTATION_SPEED, dy * ROTATION_SPEED);
                 break;
             case SDL_KEYDOWN:
+                // quit application on ESC
                 if (event.key.keysym.sym == SDLK_ESCAPE)
                 {
                     is_running = updateCam = false;
                 }
+                // move camera with traditional WASD
                 else if (event.key.keysym.sym == SDLK_w)
                 {
                     cam.move(forward * MOVEMENT_SPEED);
@@ -174,10 +207,16 @@ int main(int argc, char *argv[])
                 {
                     cam.move(right * MOVEMENT_SPEED);
                 }
-                else if (event.key.keysym.sym == SDLK_g)
+                // additional control inputs
+                else if (event.key.keysym.sym == SDLK_g) // release mouse cursor on G
                 {
                     relative = !relative;
                     SDL_SetRelativeMouseMode(relative ? SDL_TRUE : SDL_FALSE);
+                }
+                // switch rendering methods with numbers 0-9
+                else if (event.key.keysym.sym >= SDLK_0 && event.key.keysym.sym <= SDLK_9)
+                {
+                    render_method = event.key.keysym.sym - SDLK_0;
                 }
             default:
                 break;
@@ -204,7 +243,7 @@ int main(int argc, char *argv[])
 
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
-        render(pixels, bvh, WINDOW_WIDTH, WINDOW_HEIGHT);
+        render(pixels, bvh, WINDOW_WIDTH, WINDOW_HEIGHT, render_method);
         SDL_UpdateTexture(buffer, nullptr, pixels, WINDOW_WIDTH * 4);
         SDL_RenderCopy(renderer, buffer, nullptr, nullptr);
         if (msg)
