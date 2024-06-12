@@ -31,11 +31,13 @@ namespace BVH
         return node;
     }
 
-    bool AABBTree::does_intersect_ray(Vector4 origin, Vector4 direction, float *t_out) const
+    bool AABBTree::does_intersect_ray(Vector4 origin, Vector4 direction, float *t_out, Vector4 *pt_out, Vector4 *normal_out) const
     {
         Ray ray(origin, direction);
         intersect_ray_bvh(ray, (Node *)root);
         *t_out = ray.get_t();
+        *pt_out = ray.get_pt();
+        *normal_out = ray.get_normal();
         return ray.get_t() < std::numeric_limits<float>::max();
     }
 

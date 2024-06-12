@@ -64,13 +64,19 @@ static void render(Color *pixels, const BVH::AABBTree &bvh, int width, int heigh
         Vector4 ray_direction = (pixel_pos - cam_pos).normalized3();
 
         float t = 0.0f;
-        if (bvh.does_intersect_ray(ray_origin, ray_direction, &t))
+        Vector4 pt, normal;
+        if (bvh.does_intersect_ray(ray_origin, ray_direction, &t, &pt, &normal))
         {
             // Map t from [0, inf[ to [0, 1[
             // https://math.stackexchange.com/a/3200751/691043
             float t_normalized = std::atan(t) / (3.14 / 2);
             unsigned char pixel_color = (t_normalized * t_normalized) * 255;
-            pixels[pixel_x + pixel_y * width] = {255, pixel_color, pixel_color, pixel_color};
+            // pixels[pixel_x + pixel_y * width] = {255, pixel_color, pixel_color, pixel_color};
+            pixels[pixel_x + pixel_y * width] = { 255,
+                                                  (unsigned char) ((normal.x+1) * 128),
+                                                  (unsigned char) ((normal.y+1) * 128),
+                                                  (unsigned char) ((normal.z+1) * 128) };
+
         }
         else
         {

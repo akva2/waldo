@@ -12,7 +12,7 @@ namespace BVH
     struct Ray
     {
     private:
-        Vector4 m_origin, m_direction, m_reciprocal_direction;
+        Vector4 m_origin, m_direction, m_reciprocal_direction, m_pt, m_normal;
         float m_t;
 
     public:
@@ -37,6 +37,26 @@ namespace BVH
         Vector4 get_origin() const
         {
             return m_origin;
+        }
+
+        Vector4 get_pt() const
+        {
+            return m_pt;
+        }
+
+        void set_pt(Vector4 pt)
+        {
+            this->m_pt = pt;
+        }
+
+        Vector4 get_normal() const
+        {
+            return m_normal;
+        }
+
+        void set_normal(Vector4 normal)
+        {
+            this->m_normal = normal;
         }
 
         float get_t() const
@@ -80,7 +100,11 @@ namespace BVH
             is_point_above_plane(p, p2_n, tri.vertices[1]) &&
             is_point_above_plane(p, p3_n, tri.vertices[2]))
         {
-            ray.set_t(std::min(ray.get_t(), t));
+            if(t < ray.get_t()) {
+                ray.set_t(t);
+                ray.set_normal(normal);
+                ray.set_pt(p);
+            }
         }
     }
 

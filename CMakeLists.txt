@@ -22,7 +22,17 @@ FetchContent_Declare(
     OVERRIDE_FIND_PACKAGE)
 FetchContent_MakeAvailable(googletest)
 
+FetchContent_Declare(
+    SDL2
+    GIT_REPOSITORY  https://github.com/libsdl-org/SDL
+    GIT_TAG         release-2.30.3
+    GIT_PROGRESS    TRUE
+)
+FetchContent_MakeAvailable(sdl2)
+
 # find_package(fmt REQUIRED)
+find_package(OpenMP REQUIRED)
+
 
 
 FetchContent_declare(microstl
@@ -38,14 +48,28 @@ add_library(Waldo src/ReadSTL.cpp
 target_include_directories(Waldo PUBLIC ${microstl_SOURCE_DIR} 3rd_party/bvh)
 target_link_libraries(Waldo PUBLIC fmt::fmt)
 
-set(TEST_SOURCES test/TestReadSTL.cpp)
+# set(TEST_SOURCES test/TestReadSTL.cpp)
 
-add_executable(Waldo-test ${TEST_SOURCES})
-target_link_libraries(Waldo-test Waldo GTest::gtest GTest::gtest_main)
-target_include_directories(Waldo-test PUBLIC ${PROJECT_SOURCE_DIR}/src)
+# add_executable(Waldo-test ${TEST_SOURCES})
+# target_link_libraries(Waldo-test Waldo GTest::gtest GTest::gtest_main)
+# target_include_directories(Waldo-test PUBLIC ${PROJECT_SOURCE_DIR}/src)
 
-enable_testing()
-include(GoogleTest)
-gtest_discover_tests(Waldo-test
-                     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/test
-                     NO_PRETTY_VALUES)
+# enable_testing()
+# include(GoogleTest)
+# gtest_discover_tests(Waldo-test
+#                      WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/test
+#                      NO_PRETTY_VALUES)
+
+
+                     
+# add_executable(Raytrace 3rd_party/bvh/${raytrace})
+# target_link_libraries(Raytrace Waldo GTest::gtest GTest::gtest_main SDL2::SDL2)
+
+# add_library(bvh "bvh.cpp" "bvh.hpp" "subdivision.hpp" "ray_intersection.hpp" "utils.hpp" "non_copyable.hpp")
+add_executable(raytrace "3rd_party/bvh/raytrace.cpp" "3rd_party/bvh/camera.hpp" "3rd_party/bvh/raytrace.hpp")
+set_target_properties(raytrace PROPERTIES LINK_FLAGS /SUBSYSTEM:CONSOLE)
+target_include_directories(raytrace PUBLIC ${PROJECT_SOURCE_DIR}/src)
+
+# Note: SDL2::SDL2main has to come before SDL2::SDL2
+# https://github.com/msys2/MINGW-packages/issues/10459#issuecomment-1003700201
+target_link_libraries(raytrace Waldo bvh SDL2::SDL2main SDL2::SDL2-static OpenMP::OpenMP_CXX)

@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "bvh.hpp"
-#include "tiny_stl.hpp"
+#include "ReadSTL.hpp"
 
 std::vector<BVH::Triangle> bvh_tris_from_tri_file(const char *filepath, float scale)
 {
@@ -34,8 +34,17 @@ std::vector<BVH::Triangle> bvh_tris_from_tri_file(const char *filepath, float sc
 
 std::vector<BVH::Triangle> bvh_tris_from_stl_file(const char *filepath, float scale)
 {
-    auto reader = Tiny_STL::create_reader(filepath);
-    std::vector<BVH::Triangle> tris;
+    std::vector<BVH::Triangle> tris = STLReader::read(filepath, true);
+    for (auto& tri : tris) {
+        for (int i = 0; i < 3; i++)
+        {
+            for (int j = 0; j < 3; j++)
+            {
+                tri.vertices[i][j] *= scale;
+            }
+        }
+    }
+    /*
     Tiny_STL::Triangle t;
     BVH::Triangle bt;
     while (reader->read_next_triangle(&t))
@@ -49,6 +58,7 @@ std::vector<BVH::Triangle> bvh_tris_from_stl_file(const char *filepath, float sc
         }
         tris.push_back(bt);
     }
+    */
     return tris;
 }
 

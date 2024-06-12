@@ -62,7 +62,7 @@ namespace BVH
 
         ~AABBTree();
 
-        bool does_intersect_ray(Vector4 origin, Vector4 direction, float *t_out) const;
+        bool does_intersect_ray(Vector4 origin, Vector4 direction, float *t_out, Vector4 *pt_out, Vector4 *normal_out) const;
 
         void print_stats() const;
     };
