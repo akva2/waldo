@@ -53,7 +53,7 @@ static void render(Color *pixels, const BVH::AABBTree &bvh, int width, int heigh
     }
 
     auto t1 = std::chrono::high_resolution_clock::now();
-#pragma omp parallel for default(none) firstprivate(aspect_ratio, width, height, cam_pos, forward, right, tan_half_fov, up) shared(bvh, pixels)
+#pragma omp parallel for default(none) firstprivate(aspect_ratio, width, height, cam_pos, forward, right, tan_half_fov, up) shared(bvh, light, material, pixels, render_method)
     for (int i = 0; i < width * height; i++)
     {
         int pixel_x = i % width;
