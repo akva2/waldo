@@ -41,6 +41,16 @@ public:
         return fov;
     }
 
+    float get_yaw() const
+    {
+        return yaw;
+    }
+
+    float get_pitch() const
+    {
+        return pitch;
+    }
+
     Vector4 get_pos() const
     {
         return pos;
