@@ -14,6 +14,7 @@
 #include <stdexcept>
 
 namespace {
+
 class BVHHandler : public microstl::Reader::Handler
 {
 public:

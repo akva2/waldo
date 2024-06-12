@@ -44,21 +44,7 @@ std::vector<BVH::Triangle> bvh_tris_from_stl_file(const char *filepath, float sc
             }
         }
     }
-    /*
-    Tiny_STL::Triangle t;
-    BVH::Triangle bt;
-    while (reader->read_next_triangle(&t))
-    {
-        for (int i = 0; i < 3; i++)
-        {
-            for (int j = 0; j < 3; j++)
-            {
-                bt.vertices[i][j] = t.vertices[i][j] * scale;
-            }
-        }
-        tris.push_back(bt);
-    }
-    */
+
     return tris;
 }
 
