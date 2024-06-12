@@ -69,7 +69,7 @@ static void render(Color *pixels, const BVH::AABBTree &bvh, int width, int heigh
         {
             // Map t from [0, inf[ to [0, 1[
             // https://math.stackexchange.com/a/3200751/691043
-            float t_normalized = std::atan(t) / (3.14 / 2);
+            float t_normalized = std::atan(t) / (M_PI_2);
             unsigned char pixel_color = (t_normalized * t_normalized) * 255;
             // pixels[pixel_x + pixel_y * width] = {255, pixel_color, pixel_color, pixel_color};
             pixels[pixel_x + pixel_y * width] = { 255,
