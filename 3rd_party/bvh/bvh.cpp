@@ -8,24 +8,19 @@
 namespace BVH
 {
 
-    AABBTree::AABBTree(const std::vector<Triangle> &tris, float aabb_expansion) : tris(tris)
+    AABBTree::AABBTree(std::vector<Triangle>& tri, float aabb_expansion) : tris(tri)
     {
-        preallocated_nodes = new Node[2 * tris.size()];
+        preallocated_nodes.resize(2 * tris.size());
 
         root = new_node(this->tris.begin(), this->tris.end());
         subdivide((Node *)root, aabb_expansion);
         assert(count_leaf_triangles((Node *)root) == tris.size());
     }
 
-    AABBTree::~AABBTree()
-    {
-        delete[] preallocated_nodes;
-    }
-
     Node *AABBTree::new_node(std::vector<Triangle>::iterator begin, std::vector<Triangle>::iterator end)
     {
         assert(num_used_nodes < (2 * tris.size()));
-        Node *node = preallocated_nodes + (num_used_nodes++);
+        Node* node = &preallocated_nodes[num_used_nodes++];
         node->begin = begin;
         node->end = end;
         return node;
@@ -44,7 +39,7 @@ namespace BVH
     void AABBTree::print_stats() const
     {
         std::cout << "Num. BVH triangles = " << tris.size() << std::endl;
-        std::cout << "Num. BVH leaf nodes = " << count_leaf_nodes((Node *)root) << std::endl;
+        std::cout << "Num. BVH leaf nodes = " << count_leaf_nodes(root) << std::endl;
     }
 
 }

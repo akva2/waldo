@@ -1,5 +1,7 @@
-#pragma once
+#ifndef BVH_HPP_
+#define BVH_HPP_
 
+#include <cstddef>
 #include <vector>
 
 #include "non_copyable.hpp"
@@ -49,18 +51,16 @@ namespace BVH
     {
 
     private:
-        std::vector<Triangle> tris;
-        Node *root = nullptr;
-        Node *preallocated_nodes = nullptr;
-        int num_used_nodes = 0;
+        std::vector<Triangle>& tris;
+        Node* root = nullptr;
+        std::vector<Node> preallocated_nodes;
+        std::size_t num_used_nodes = 0;
 
         Node *new_node(std::vector<Triangle>::iterator begin, std::vector<Triangle>::iterator end);
         void subdivide(Node *, float);
 
     public:
-        explicit AABBTree(const std::vector<Triangle> &tris, float aabb_expansion);
-
-        ~AABBTree();
+        AABBTree(std::vector<Triangle>& tris, float aabb_expansion);
 
         bool does_intersect_ray(Vector4 origin, Vector4 direction, float *t_out, Vector4 *pt_out, Vector4 *normal_out) const;
 
@@ -68,3 +68,5 @@ namespace BVH
     };
 
 }
+
+#endif
