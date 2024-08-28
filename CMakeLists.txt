@@ -67,7 +67,21 @@ endif()
 # Note: SDL2::SDL2main has to come before SDL2::SDL2
 # https://github.com/msys2/MINGW-packages/issues/10459#issuecomment-1003700201
 target_link_libraries(raytrace Waldo bvh SDL2::SDL2main SDL2::SDL2-static
-                               SDL2_ttf::SDL2_ttf-static OpenMP::OpenMP_CXX)
+                               SDL2_ttf::SDL2_ttf-static SDL2::Image OpenMP::OpenMP_CXX)
+
+find_package(OpenGL)
+if(OpenGL_FOUND)
+  add_executable(render apps/render.cpp)
+  target_include_directories(render PUBLIC ${microstl_SOURCE_DIR} 3rd_party/bvh src)
+  if(WIN32)
+    set_target_properties(render PROPERTIES LINK_FLAGS /SUBSYSTEM:CONSOLE)
+  endif()
+
+  # Note: SDL2::SDL2main has to come before SDL2::SDL2
+  # https://github.com/msys2/MINGW-packages/issues/10459#issuecomment-1003700201
+  target_link_libraries(render Waldo bvh SDL2::SDL2main SDL2::SDL2-static OpenGL::OpenGL
+                               SDL2_ttf::SDL2_ttf-static SDL2::Image OpenMP::OpenMP_CXX)
+endif()
 
 add_executable(center_stl apps/center_stl.cpp)
 target_include_directories(center_stl PUBLIC ${microstl_SOURCE_DIR})
