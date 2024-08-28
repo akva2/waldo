@@ -48,6 +48,13 @@ FetchContent_declare(microstl
                      GIT_TAG master)
 FetchContent_Populate(microstl)
 
+FetchContent_Declare(
+  glm
+  GIT_REPOSITORY https://github.com/g-truc/glm.git
+  GIT_TAG		   1.0.1
+)
+FetchContent_MakeAvailable(glm)
+
 add_subdirectory(3rd_party/bvh)
 
 add_library(Waldo src/ReadSTL.cpp
@@ -67,7 +74,7 @@ endif()
 # Note: SDL2::SDL2main has to come before SDL2::SDL2
 # https://github.com/msys2/MINGW-packages/issues/10459#issuecomment-1003700201
 target_link_libraries(raytrace Waldo bvh SDL2::SDL2main SDL2::SDL2-static
-                               SDL2_ttf::SDL2_ttf-static SDL2::Image OpenMP::OpenMP_CXX)
+                               SDL2_ttf::SDL2_ttf-static OpenMP::OpenMP_CXX)
 
 find_package(OpenGL)
 if(OpenGL_FOUND)
@@ -79,8 +86,8 @@ if(OpenGL_FOUND)
 
   # Note: SDL2::SDL2main has to come before SDL2::SDL2
   # https://github.com/msys2/MINGW-packages/issues/10459#issuecomment-1003700201
-  target_link_libraries(render Waldo bvh SDL2::SDL2main SDL2::SDL2-static OpenGL::OpenGL
-                               SDL2_ttf::SDL2_ttf-static SDL2::Image OpenMP::OpenMP_CXX)
+  target_link_libraries(render Waldo bvh SDL2::SDL2main SDL2::SDL2-static OpenGL::GL
+                               SDL2_ttf::SDL2_ttf-static OpenMP::OpenMP_CXX glm::glm)
 endif()
 
 add_executable(center_stl apps/center_stl.cpp)

@@ -9,15 +9,16 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <glm/gtx/string_cast.hpp>
+//#include <glm/gtx/string_cast.hpp>
 
 #include <iostream>
-#include <sstream>
 #include <string>
 #include <vector>
 
 static constexpr int WINDOW_WIDTH = 1600;
 static constexpr int WINDOW_HEIGHT = 900;
+constexpr float ROTATION_SPEED = .1;
+constexpr float MOVEMENT_SPEED = 10;
 
 using namespace std::string_literals;
 
@@ -147,6 +148,7 @@ int main(int argc, char** argv)
 
 
     SDL_GLContext ctx = SDL_GL_CreateContext(window);
+    SDL_SetRelativeMouseMode(SDL_TRUE);
 
     glEnable(GL_DEPTH_TEST);
 
@@ -201,15 +203,14 @@ int main(int argc, char** argv)
     // VAOs requires a call to glBindVertexArray anyways so we generally don't unbind VAOs (nor VBOs) when it's not directly necessary.
     glBindVertexArray(0);
 
-    glm::mat4 identity = glm::identity<glm::mat4>();
+    // camera
+    glm::vec3 cameraPos   = glm::vec3(0.0f, 0.0f, 3.0f);
+    glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+    glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f, 0.0f);
+
     glm::mat4 projection = glm::perspective(glm::radians(45.f),
                                             float(WINDOW_WIDTH) / float(WINDOW_HEIGHT),
                                             0.1f, 100000.f);
-    // glm::mat4 projection = glm::ortho(-1.f, 1.f, -1.f, 1.f, -1.f, 1.f);
-
-    glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 01.0f, 3.0f),
-                                 glm::vec3(0.0f, 0.0f, 0.0f),
-                                 glm::vec3(0.0f, 1.0f, 0.0f));
 
     glUseProgram(spId);
     glUniformMatrix4fv(glGetUniformLocation(spId, "projection"), 1, GL_FALSE,
@@ -217,38 +218,61 @@ int main(int argc, char** argv)
 
     SDL_Event event;
     bool is_running = true;
-    float angle = 0.f, position = 0.f;
+    double yaw = 0.f, pitch = 0.f;
     bool right = false;
     int level = 0;
+    bool update_view = true;
+    auto ticks = SDL_GetTicks64();
+    decltype(ticks) delta = 0;
     while (is_running) {
         while (SDL_PollEvent(&event) != 0)
         {
             switch (event.type)
             {
+            case SDL_MOUSEMOTION:
+                yaw += event.motion.xrel * ROTATION_SPEED;
+                pitch += event.motion.yrel * ROTATION_SPEED;
+                if (pitch > 89.0f)
+                    pitch = 89.0f;
+                if (pitch < -89.0f)
+                    pitch = -89.0f;
+                glm::vec3 front;
+                front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+                front.y = sin(glm::radians(pitch));
+                front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+                cameraFront = glm::normalize(front);
+                update_view = true;
+                break;
             case SDL_QUIT:
                 is_running = false;
                 break;
             case SDL_KEYDOWN:
             {
                 bool update_data = false;
+                auto ticks2 = SDL_GetTicks64();
+                float cameraSpeed = 25 * delta / 1000.f;
                 // quit application on ESC
                 if (event.key.keysym.sym == SDLK_ESCAPE)
                     is_running = false;
-                else if (event.key.keysym.sym == SDLK_PLUS)
+                else if (event.key.keysym.sym == SDLK_w)
                 {
-                    position += 1.f;
+                    cameraPos += cameraSpeed * cameraFront;
+                    update_view = true;
                 }
-                else if (event.key.keysym.sym == SDLK_MINUS)
+                else if (event.key.keysym.sym == SDLK_s)
                 {
-                    position -= 1.f;
+                    cameraPos -= cameraSpeed * cameraFront;
+                    update_view = true;
                 }
-                else if (event.key.keysym.sym == SDLK_KP_PLUS)
+                else if (event.key.keysym.sym == SDLK_a)
                 {
-                    angle += 5.f;
+                    cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+                    update_view = true;
                 }
-                else if (event.key.keysym.sym == SDLK_KP_MINUS)
+                else if (event.key.keysym.sym == SDLK_d)
                 {
-                    angle -= 5.f;
+                    cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+                    update_view = true;
                 }
                 else if (event.key.keysym.sym == SDLK_l)
                 {
@@ -282,13 +306,19 @@ int main(int argc, char** argv)
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glBindVertexArray(VAO);
-        glm::mat4 rot = glm::rotate(view, glm::radians(angle), glm::vec3(0.f, 1.f, 0.f));
-        rot = glm::translate(rot, glm::vec3(0.f, 0.f, position));
-        glUniformMatrix4fv(glGetUniformLocation(spId, "view"), 1, GL_FALSE, &rot[0][0]);
+        if (update_view) {
+            glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+            glUniformMatrix4fv(glGetUniformLocation(spId, "view"), 1, GL_FALSE, &view[0][0]);
+            update_view = false;
+        }
         glDrawArrays(GL_LINES, 0, vertices.size() / 3);
         SDL_GL_SwapWindow(window);
+        auto ticks2 = SDL_GetTicks64();
+        delta = ticks2 - ticks;
+        ticks = ticks2;
     }
 
+    SDL_GL_DeleteContext(ctx);
     SDL_DestroyWindow(window);
 
     return 0;
