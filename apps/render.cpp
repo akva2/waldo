@@ -9,7 +9,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-//#include <glm/gtx/string_cast.hpp>
 
 #include <iostream>
 #include <string>
@@ -28,19 +27,23 @@ layout (location = 0) in vec3 aPos;
 
 uniform mat4 projection;
 uniform mat4 view;
+uniform float alpha;
+out float a;
 
 void main()
 {
    gl_Position = projection * view * vec4(aPos, 1.0);
+   a = alpha;
 }
 )"s;
 
 const std::string fShader =
 R"(#version 330 core
+in float a;
 out vec4 FragColor;
 void main()
 {
-   FragColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);
+   FragColor = vec4(1.0f, 1.0f, 1.0f, a);
 }
 )"s;
 
@@ -100,29 +103,81 @@ void addAABB_lines(std::vector<float>& vertices, const BVH::Node* node,
     const auto& y2 = node->aabb.upper.y;
     const auto& z2 = node->aabb.upper.z;
 
-    auto addLine = [&vertices](float x1, float y1, float z1,
-                               float x2, float y2, float z2)
+    auto addLine = [&vertices](const glm::vec3& v1,
+                               const glm::vec3& v2)
     {
-      vertices.push_back(x1);
-      vertices.push_back(y1);
-      vertices.push_back(z1);
-      vertices.push_back(x2);
-      vertices.push_back(y2);
-      vertices.push_back(z2);
+      vertices.push_back(v1.x);
+      vertices.push_back(v1.y);
+      vertices.push_back(v1.z);
+      vertices.push_back(v2.x);
+      vertices.push_back(v2.y);
+      vertices.push_back(v2.z);
     };
 
-    addLine(x1,y1,z1,x2,y1,z1);
-    addLine(x2,y1,z1,x2,y1,z2);
-    addLine(x2,y1,z2,x1,y1,z2);
-    addLine(x1,y1,z2,x1,y1,z1);
-    addLine(x1,y1,z1,x1,y2,z1);
-    addLine(x2,y1,z1,x2,y2,z1);
-    addLine(x2,y1,z2,x2,y2,z2);
-    addLine(x1,y1,z2,x1,y2,z2);
-    addLine(x1,y2,z1,x2,y2,z1);
-    addLine(x2,y2,z1,x2,y2,z2);
-    addLine(x2,y2,z2,x1,y2,z2);
-    addLine(x1,y2,z2,x1,y2,z1);
+    addLine({x1, y1, z1}, {x2, y1, z1});
+    addLine({x2, y1, z1}, {x2, y1, z2});
+    addLine({x2, y1, z2}, {x1, y1, z2});
+    addLine({x1, y1, z2}, {x1, y1, z1});
+    addLine({x1, y1, z1}, {x1, y2, z1});
+    addLine({x2, y1, z1}, {x2, y2, z1});
+    addLine({x2, y1, z2}, {x2, y2, z2});
+    addLine({x1, y1, z2}, {x1, y2, z2});
+    addLine({x1, y2, z1}, {x2, y2, z1});
+    addLine({x2, y2, z1}, {x2, y2, z2});
+    addLine({x2, y2, z2}, {x1, y2, z2});
+    addLine({x1, y2, z2}, {x1, y2, z1});
+}
+
+void addAABB_tri(std::vector<float>& vertices, const BVH::Node* node,
+                 int depth, int part)
+{
+    if (depth > 0) {
+        if ((part == 0 || part == 1) && node->left)
+            addAABB_tri(vertices, node->left, depth-1, part);
+        if ((part == 0 || part == 2) && node->right)
+            addAABB_tri(vertices, node->right, depth-1, part);
+        return;
+    }
+
+    const auto& x1 = node->aabb.lower.x;
+    const auto& y1 = node->aabb.lower.y;
+    const auto& z1 = node->aabb.lower.z;
+    const auto& x2 = node->aabb.upper.x;
+    const auto& y2 = node->aabb.upper.y;
+    const auto& z2 = node->aabb.upper.z;
+
+    auto addTri = [&vertices](const glm::vec3& v1,
+                              const glm::vec3& v2,
+                              const glm::vec3& v3)
+    {
+      vertices.push_back(v1.x);
+      vertices.push_back(v1.y);
+      vertices.push_back(v1.z);
+      vertices.push_back(v2.x);
+      vertices.push_back(v2.y);
+      vertices.push_back(v2.z);
+      vertices.push_back(v3.x);
+      vertices.push_back(v3.y);
+      vertices.push_back(v3.z);
+    };
+
+    addTri({x1, y1, z1}, {x2, y1, z1}, {x2, y2, z1});
+    addTri({x1, y1, z1}, {x2, y2, z1}, {x1, y2, z1});
+
+    addTri({x1, y1, z2}, {x2, y1, z2}, {x2, y2, z2});
+    addTri({x1, y1, z2}, {x2, y2, z2}, {x1, y2, z2});
+
+    addTri({x1, y1, z2}, {x1, y2, z2}, {x1, y2, z1});
+    addTri({x1, y1, z2}, {x1, y1, z1}, {x1, y2, z1});
+
+    addTri({x2, y1, z1}, {x2, y2, z1}, {x2, y2, z2});
+    addTri({x2, y1, z1}, {x2, y1, z2}, {x2, y2, z2});
+
+    addTri({x1, y1, z1}, {x2, y1, z1}, {x2, y1, z2});
+    addTri({x1, y1, z1}, {x1, y1, z2}, {x2, y1, z2});
+
+    addTri({x1, y2, z1}, {x2, y2, z1}, {x2, y2, z2});
+    addTri({x1, y2, z1}, {x1, y2, z2}, {x2, y2, z2});
 }
 
 int main(int argc, char** argv)
@@ -151,6 +206,8 @@ int main(int argc, char** argv)
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     unsigned int vId = compileShader(vShader, GL_VERTEX_SHADER);
     unsigned int fId = compileShader(fShader, GL_FRAGMENT_SHADER);
@@ -173,28 +230,30 @@ int main(int argc, char** argv)
     glDeleteShader(vId);
     glDeleteShader(fId);
 
-/*    std::vector<float> vertices(tris.size()*9);
-    for (size_t i = 0, idx = 0; i < tris.size(); ++i)
-        for (size_t j = 0; j < 3; ++j) {
-            vertices[idx++] = tris[i].vertices[j][0];
-            vertices[idx++] = tris[i].vertices[j][1];
-            vertices[idx++] = tris[i].vertices[j][2];
-        }*/
-    std::vector<float> vertices;
-    addAABB_lines(vertices, bvh.root, 0, false);
+    std::vector<float> verticesL;
+    std::vector<float> verticesV;
+    addAABB_lines(verticesL, bvh.root, 0, false);
+    addAABB_tri(verticesV, bvh.root, 0, false);
 
-    unsigned int VBO, VAO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
+    unsigned int VBO[2], VAO[2];
+    glGenVertexArrays(2, VAO);
+    glGenBuffers(2, VBO);
 
     // bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
-    glBindVertexArray(VAO);
-
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size()*sizeof(float), vertices.data(), GL_STATIC_DRAW);
-
+    glBindVertexArray(VAO[0]);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO[0]);
+    glBufferData(GL_ARRAY_BUFFER, verticesL.size()*sizeof(float),
+                 verticesL.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
-    glEnableVertexAttribArray(0);
+
+    glBindVertexArray(VAO[1]);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO[1]);
+    glBufferData(GL_ARRAY_BUFFER, verticesV.size()*sizeof(float),
+                 verticesV.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+
+    glEnableVertexArrayAttrib(VAO[0], 0);
+    glEnableVertexArrayAttrib(VAO[1], 0);
 
     // note that this is allowed, the call to glVertexAttribPointer registered VBO as the vertex attribute's bound vertex buffer object so afterwards we can safely unbind
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -219,11 +278,13 @@ int main(int argc, char** argv)
     SDL_Event event;
     bool is_running = true;
     double yaw = 0.f, pitch = 0.f;
-    bool right = false;
+    int part = 0;
     int level = 0;
     bool update_view = true;
     auto ticks = SDL_GetTicks64();
     decltype(ticks) delta = 0;
+    bool tri = false;
+    bool relative = true;
     while (is_running) {
         while (SDL_PollEvent(&event) != 0)
         {
@@ -231,7 +292,7 @@ int main(int argc, char** argv)
             {
             case SDL_MOUSEMOTION:
                 yaw += event.motion.xrel * ROTATION_SPEED;
-                pitch += event.motion.yrel * ROTATION_SPEED;
+                pitch -= event.motion.yrel * ROTATION_SPEED;
                 if (pitch > 89.0f)
                     pitch = 89.0f;
                 if (pitch < -89.0f)
@@ -249,8 +310,7 @@ int main(int argc, char** argv)
             case SDL_KEYDOWN:
             {
                 bool update_data = false;
-                auto ticks2 = SDL_GetTicks64();
-                float cameraSpeed = 25 * delta / 1000.f;
+                float cameraSpeed = 100 * delta / 1000.f;
                 // quit application on ESC
                 if (event.key.keysym.sym == SDLK_ESCAPE)
                     is_running = false;
@@ -276,13 +336,29 @@ int main(int argc, char** argv)
                 }
                 else if (event.key.keysym.sym == SDLK_l)
                 {
-                    right = false;
+                    part = 1;
                     update_data = true;
                 }
                 else if (event.key.keysym.sym == SDLK_r)
                 {
-                    right = true;
+                    part = 2;
                     update_data = true;
+                }
+                else if (event.key.keysym.sym == SDLK_b)
+                {
+                    part = 0;
+                    update_data = true;
+                }
+                else if (event.key.keysym.sym == SDLK_t)
+                {
+                    tri = !tri;
+                    update_data = true;
+                }
+                // additional control inputs
+                else if (event.key.keysym.sym == SDLK_g) // release mouse cursor on G
+                {
+                    relative = !relative;
+                    SDL_SetRelativeMouseMode(relative ? SDL_TRUE : SDL_FALSE);
                 }
                 else if (event.key.keysym.sym >= SDLK_0 && event.key.keysym.sym <= SDLK_9)
                 {
@@ -291,10 +367,16 @@ int main(int argc, char** argv)
                 }
                 if (update_data)
                 {
-                    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-                    vertices.clear();
-                    addAABB_lines(vertices, bvh.root, level, right);
-                    glBufferData(GL_ARRAY_BUFFER, vertices.size()*sizeof(float), vertices.data(), GL_STATIC_DRAW);
+                    verticesL.clear();
+                    verticesV.clear();
+                    addAABB_lines(verticesL, bvh.root, level, part);
+                    glBindBuffer(GL_ARRAY_BUFFER, VBO[0]);
+                    glBufferData(GL_ARRAY_BUFFER, verticesL.size()*sizeof(float),
+                                 verticesL.data(), GL_STATIC_DRAW);
+                    addAABB_tri(verticesV, bvh.root, level, part);
+                    glBindBuffer(GL_ARRAY_BUFFER, VBO[1]);
+                    glBufferData(GL_ARRAY_BUFFER, verticesV.size()*sizeof(float),
+                                 verticesV.data(), GL_STATIC_DRAW);
                 }
                 break;
             }
@@ -305,13 +387,19 @@ int main(int argc, char** argv)
 
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glBindVertexArray(VAO);
         if (update_view) {
             glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
             glUniformMatrix4fv(glGetUniformLocation(spId, "view"), 1, GL_FALSE, &view[0][0]);
             update_view = false;
         }
-        glDrawArrays(GL_LINES, 0, vertices.size() / 3);
+        glUniform1f(glGetUniformLocation(spId, "alpha"), 1.f);
+        glBindVertexArray(VAO[0]);
+        glDrawArrays(GL_LINES, 0, verticesL.size() / 3);
+        if (tri) {
+            glBindVertexArray(VAO[1]);
+            glUniform1f(glGetUniformLocation(spId, "alpha"), 0.5f);
+            glDrawArrays(GL_TRIANGLES, 0, verticesV.size() / 3);
+        }
         SDL_GL_SwapWindow(window);
         auto ticks2 = SDL_GetTicks64();
         delta = ticks2 - ticks;
