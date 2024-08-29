@@ -372,6 +372,7 @@ int main(int argc, char** argv)
     bool update_view = true;
     auto ticks = SDL_GetTicks64();
     decltype(ticks) delta = 0;
+    bool lines = true;
     bool tri = false;
     bool relative = true;
     bool model = true;
@@ -444,6 +445,11 @@ int main(int argc, char** argv)
                     tri = !tri;
                     update_data = true;
                 }
+                else if (event.key.keysym.sym == SDLK_y)
+                {
+                    lines = !lines;
+                    update_data = true;
+                }
                 else if (event.key.keysym.sym == SDLK_m)
                 {
                     model = !model;
@@ -496,11 +502,15 @@ int main(int argc, char** argv)
             glDrawArrays(GL_TRIANGLES, 0, verticesM.size() / 6);
         }
 
-        glUseProgram(spId);
-        glBindVertexArray(VAO[0]);
-        glUniform1f(glGetUniformLocation(spId, "alpha"), 1.f);
-        glDrawArrays(GL_LINES, 0, verticesL.size() / 3);
+        if (lines) {
+            glUseProgram(spId);
+            glBindVertexArray(VAO[0]);
+            glUniform1f(glGetUniformLocation(spId, "alpha"), 1.f);
+            glDrawArrays(GL_LINES, 0, verticesL.size() / 3);
+        }
+
         if (tri) {
+            glUseProgram(spId);
             glBindVertexArray(VAO[1]);
             glUniform1f(glGetUniformLocation(spId, "alpha"), 0.5f);
             glDrawArrays(GL_TRIANGLES, 0, verticesV.size() / 3);
