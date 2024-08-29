@@ -24,26 +24,31 @@ public:
     }
 
     void onFacet(const float v1[3], const float v2[3],
-                 const float v3[3], const float[3]) override
+                 const float v3[3], const float n[3]) override
     {
         BVH::Triangle tri;
         tri.vertices[0] = Vector4(v1[0], v1[1], v1[2]);
         tri.vertices[1] = Vector4(v2[0], v2[1], v2[2]);
         tri.vertices[2] = Vector4(v3[0], v3[1], v3[2]);
+        nrmls.emplace_back(std::array{n[0], n[1], n[2]});
         tris.emplace_back(std::move(tri));
     }
 
     std::vector<BVH::Triangle>&& triangles() { return std::move(tris); }
+    std::vector<std::array<float,3>>&& normals() { return std::move(nrmls); }
 
 private:
     std::vector<BVH::Triangle> tris;
+    std::vector<std::array<float,3>> nrmls;
 };
 
 }
 
 namespace STLReader {
 
-std::vector<BVH::Triangle> read(std::string_view path, bool is_file)
+std::tuple<std::vector<BVH::Triangle>,
+           std::vector<std::array<float, 3>>>
+read(std::string_view path, bool is_file)
 {
     BVHHandler meshHandler;
     microstl::Result result;
@@ -57,7 +62,7 @@ std::vector<BVH::Triangle> read(std::string_view path, bool is_file)
         throw std::runtime_error(fmt::format("Error reading {}, error = {}",
                                              path, microstl::getResultString(result)));
 
-    return meshHandler.triangles();
+    return {meshHandler.triangles(), meshHandler.normals()};
 }
 
 }

@@ -34,7 +34,7 @@ std::vector<BVH::Triangle> bvh_tris_from_tri_file(const char *filepath, float sc
 
 std::vector<BVH::Triangle> bvh_tris_from_stl_file(const char *filepath, float scale)
 {
-    std::vector<BVH::Triangle> tris = STLReader::read(filepath, true);
+    auto [tris, _] = STLReader::read(filepath, true);
     for (auto& tri : tris) {
         for (int i = 0; i < 3; i++)
         {

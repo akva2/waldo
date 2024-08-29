@@ -36,7 +36,7 @@ endsolid twotriangles)";
 TEST(TestReadSTL, TwoTriangles)
 {
     try {
-        const auto tris = STLReader::read(two_triangles, false);
+        const auto [tris, normals] = STLReader::read(two_triangles, false);
         EXPECT_EQ(tris.size(), 2);
         EXPECT_EQ(tris[0].vertices[0].x, 0.0);
         EXPECT_EQ(tris[0].vertices[0].y, 0.5);

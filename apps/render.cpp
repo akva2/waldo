@@ -47,12 +47,57 @@ void main()
 }
 )"s;
 
+const std::string vShaderM =
+R"(#version 330 core
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec3 aNormal;
+
+uniform mat4 projection;
+uniform mat4 view;
+
+out vec3 Normal;
+out vec3 FragPos;
+
+void main()
+{
+    gl_Position = projection * view * vec4(aPos, 1.0);
+    Normal = vec3(view * vec4(aNormal, 1.0));
+    FragPos = aPos;
+}
+)"s;
+
+const std::string fShaderM =
+R"(#version 330 core
+in vec3 FragPos;
+in vec3 Normal;
+out vec4 FragColor;
+
+uniform vec3 lightPos;
+uniform vec3 lightColor;
+uniform vec3 objectColor;
+
+void main()
+{
+   // ambient
+   float ambientStrength = 0.1;
+   vec3 ambient = ambientStrength * lightColor;
+
+   // diffuse
+   vec3 norm = normalize(Normal);
+   vec3 lightDir = normalize(lightPos - FragPos);
+   float diff = max(dot(norm, lightDir), 0.0);
+   vec3 diffuse = diff * lightColor;
+
+   vec3 result = (ambient + diffuse) * objectColor;
+   FragColor = vec4(result, 1.0);
+}
+)"s;
+
 namespace {
 
-std::vector<BVH::Triangle>
-bvh_tris_from_stl_file(std::string_view filepath, float scale)
+auto bvh_tris_from_stl_file(std::string_view filepath, float scale)
 {
-    std::vector<BVH::Triangle> tris = STLReader::read(filepath, true);
+    auto [tris, normals] = STLReader::read(filepath, true);
     for (auto& tri : tris) {
         for (int i = 0; i < 3; i++)
         {
@@ -63,13 +108,13 @@ bvh_tris_from_stl_file(std::string_view filepath, float scale)
         }
     }
 
-    return tris;
+    return std::make_tuple(tris, normals);
 }
 }
 
-unsigned int compileShader(const std::string& source, int type)
+unsigned int compileShader(std::string_view source, int type)
 {
-    const char* ss = source.c_str();
+    const char* ss = source.data();
     unsigned int sId = glCreateShader(type);
     glShaderSource(sId, 1, &ss, nullptr);
     glCompileShader(sId);
@@ -85,23 +130,48 @@ unsigned int compileShader(const std::string& source, int type)
     return sId;
 }
 
+unsigned int makeProgram(std::string_view vShader, std::string_view fShader)
+{
+    unsigned int vId = compileShader(vShader, GL_VERTEX_SHADER);
+    unsigned int fId = compileShader(fShader, GL_FRAGMENT_SHADER);
+    if (vId == -1 || fId == -1)
+        exit(1);
+
+    unsigned int spId = glCreateProgram();
+    glAttachShader(spId, vId);
+    glAttachShader(spId, fId);
+    glLinkProgram(spId);
+    int success;
+    glGetProgramiv(spId, GL_LINK_STATUS, &success);
+    if (!success) {
+        char log[512]{};
+        glGetProgramInfoLog(spId, 512, nullptr, log);
+        std::cerr << "Error linking program: " << log << std::endl;
+        exit(2);
+    }
+    glDeleteShader(vId);
+    glDeleteShader(fId);
+
+    return spId;
+}
+
 void addAABB_lines(std::vector<float>& vertices, const BVH::Node* node,
                    int depth, int part)
 {
     if (depth > 0) {
         if ((part == 0 || part == 1) && node->left)
-            addAABB_lines(vertices, node->left, depth-1, part);
+            addAABB_lines(vertices, node->left, depth-1, 0);
         if ((part == 0 || part == 2) && node->right)
-            addAABB_lines(vertices, node->right, depth-1, part);
+            addAABB_lines(vertices, node->right, depth-1, 0);
         return;
     }
 
     const auto& x1 = node->aabb.lower.x;
-    const auto& y1 = node->aabb.lower.y;
-    const auto& z1 = node->aabb.lower.z;
+    const auto& y1 = node->aabb.lower.z;
+    const auto& z1 = node->aabb.lower.y;
     const auto& x2 = node->aabb.upper.x;
-    const auto& y2 = node->aabb.upper.y;
-    const auto& z2 = node->aabb.upper.z;
+    const auto& y2 = node->aabb.upper.z;
+    const auto& z2 = node->aabb.upper.y;
 
     auto addLine = [&vertices](const glm::vec3& v1,
                                const glm::vec3& v2)
@@ -133,18 +203,18 @@ void addAABB_tri(std::vector<float>& vertices, const BVH::Node* node,
 {
     if (depth > 0) {
         if ((part == 0 || part == 1) && node->left)
-            addAABB_tri(vertices, node->left, depth-1, part);
+            addAABB_tri(vertices, node->left, depth-1, 0);
         if ((part == 0 || part == 2) && node->right)
-            addAABB_tri(vertices, node->right, depth-1, part);
+            addAABB_tri(vertices, node->right, depth-1, 0);
         return;
     }
 
     const auto& x1 = node->aabb.lower.x;
-    const auto& y1 = node->aabb.lower.y;
-    const auto& z1 = node->aabb.lower.z;
+    const auto& y1 = node->aabb.lower.z;
+    const auto& z1 = node->aabb.lower.y;
     const auto& x2 = node->aabb.upper.x;
-    const auto& y2 = node->aabb.upper.y;
-    const auto& z2 = node->aabb.upper.z;
+    const auto& y2 = node->aabb.upper.z;
+    const auto& z2 = node->aabb.upper.y;
 
     auto addTri = [&vertices](const glm::vec3& v1,
                               const glm::vec3& v2,
@@ -180,17 +250,37 @@ void addAABB_tri(std::vector<float>& vertices, const BVH::Node* node,
     addTri({x1, y2, z1}, {x1, y2, z2}, {x2, y2, z2});
 }
 
+void addModel(std::vector<float>& vertices, const std::vector<BVH::Triangle>& tris,
+              const std::vector<std::array<float,3>>& normals)
+{
+    vertices.reserve(tris.size() * 3 * 6);
+    auto it = normals.begin();
+    for (const auto& tri : tris) {
+        const auto& n = *it;
+        for (const auto& v : tri.vertices) {
+          vertices.push_back(v.x);
+          vertices.push_back(v.z);
+          vertices.push_back(v.y);
+          vertices.push_back(n[0]);
+          vertices.push_back(n[2]);
+          vertices.push_back(n[1]);
+        }
+        ++it;
+    }
+}
+
 int main(int argc, char** argv)
 {
     if (argc < 2) {
         std::cerr << "Need one parameter, .stl file to load" << std::endl;
     }
-    std::vector<BVH::Triangle> tris = bvh_tris_from_stl_file(argv[1], 1.0);
+    auto [tris, normals] = bvh_tris_from_stl_file(argv[1], 1.0);
     std::cout << "Loaded " << tris.size() << " triangles from " << argv[1] << std::endl;
     BVH::AABBTree bvh(tris, 0.001f);
     bvh.print_stats();
 
     SDL_Init(SDL_INIT_VIDEO);
+    SDL_GL_LoadLibrary(nullptr);
 
     SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, 4);
     SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, 6);
@@ -209,35 +299,19 @@ int main(int argc, char** argv)
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    unsigned int vId = compileShader(vShader, GL_VERTEX_SHADER);
-    unsigned int fId = compileShader(fShader, GL_FRAGMENT_SHADER);
-
-    if (vId == -1 || fId == 1)
-        return 1;
-
-    unsigned int spId = glCreateProgram();
-    glAttachShader(spId, vId);
-    glAttachShader(spId, fId);
-    glLinkProgram(spId);
-    int success;
-    glGetProgramiv(spId, GL_LINK_STATUS, &success);
-    if (!success) {
-        char log[512]{};
-        glGetProgramInfoLog(spId, 512, nullptr, log);
-        std::cerr << "Error linking program: " << log << std::endl;
-        return 2;
-    }
-    glDeleteShader(vId);
-    glDeleteShader(fId);
+    unsigned int spId = makeProgram(vShader, fShader);
+    unsigned int spIdM = makeProgram(vShaderM, fShaderM);
 
     std::vector<float> verticesL;
     std::vector<float> verticesV;
+    std::vector<float> verticesM;
     addAABB_lines(verticesL, bvh.root, 0, false);
     addAABB_tri(verticesV, bvh.root, 0, false);
+    addModel(verticesM, tris, normals);
 
-    unsigned int VBO[2], VAO[2];
-    glGenVertexArrays(2, VAO);
-    glGenBuffers(2, VBO);
+    unsigned int VBO[3], VAO[3];
+    glGenVertexArrays(3, VAO);
+    glGenBuffers(3, VBO);
 
     // bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
     glBindVertexArray(VAO[0]);
@@ -252,8 +326,17 @@ int main(int argc, char** argv)
                  verticesV.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
 
+    glBindVertexArray(VAO[2]);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO[2]);
+    glBufferData(GL_ARRAY_BUFFER, verticesM.size()*sizeof(float),
+                 verticesM.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)(3*sizeof(float)));
+
     glEnableVertexArrayAttrib(VAO[0], 0);
     glEnableVertexArrayAttrib(VAO[1], 0);
+    glEnableVertexArrayAttrib(VAO[2], 0);
+    glEnableVertexArrayAttrib(VAO[2], 1);
 
     // note that this is allowed, the call to glVertexAttribPointer registered VBO as the vertex attribute's bound vertex buffer object so afterwards we can safely unbind
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -274,6 +357,12 @@ int main(int argc, char** argv)
     glUseProgram(spId);
     glUniformMatrix4fv(glGetUniformLocation(spId, "projection"), 1, GL_FALSE,
                        glm::value_ptr(projection));
+    glUseProgram(spIdM);
+    glUniformMatrix4fv(glGetUniformLocation(spIdM, "projection"), 1, GL_FALSE,
+                       glm::value_ptr(projection));
+    glUniform3f(glGetUniformLocation(spIdM, "lightPos"), 0.f, 15.f, -1.f);
+    glUniform3f(glGetUniformLocation(spIdM, "lightColor"), 0.675f, 0.512, 0.09f);
+    glUniform3f(glGetUniformLocation(spIdM, "objectColor"), 1.f, 1.f, 1.f);
 
     SDL_Event event;
     bool is_running = true;
@@ -285,6 +374,7 @@ int main(int argc, char** argv)
     decltype(ticks) delta = 0;
     bool tri = false;
     bool relative = true;
+    bool model = true;
     while (is_running) {
         while (SDL_PollEvent(&event) != 0)
         {
@@ -354,6 +444,10 @@ int main(int argc, char** argv)
                     tri = !tri;
                     update_data = true;
                 }
+                else if (event.key.keysym.sym == SDLK_m)
+                {
+                    model = !model;
+                }
                 // additional control inputs
                 else if (event.key.keysym.sym == SDLK_g) // release mouse cursor on G
                 {
@@ -389,11 +483,22 @@ int main(int argc, char** argv)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         if (update_view) {
             glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+            glUseProgram(spId);
             glUniformMatrix4fv(glGetUniformLocation(spId, "view"), 1, GL_FALSE, &view[0][0]);
+            glUseProgram(spIdM);
+            glUniformMatrix4fv(glGetUniformLocation(spIdM, "view"), 1, GL_FALSE, &view[0][0]);
             update_view = false;
         }
-        glUniform1f(glGetUniformLocation(spId, "alpha"), 1.f);
+
+        if (model) {
+            glUseProgram(spIdM);
+            glBindVertexArray(VAO[2]);
+            glDrawArrays(GL_TRIANGLES, 0, verticesM.size() / 6);
+        }
+
+        glUseProgram(spId);
         glBindVertexArray(VAO[0]);
+        glUniform1f(glGetUniformLocation(spId, "alpha"), 1.f);
         glDrawArrays(GL_LINES, 0, verticesL.size() / 3);
         if (tri) {
             glBindVertexArray(VAO[1]);
